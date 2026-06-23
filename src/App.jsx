@@ -211,7 +211,7 @@ JSON output:
 ${targetLangs.map(l => `  "${l}": { "event": "...", "desc": ${koDesc ? '"..."' : 'null'} }`).join(',\n')}
 }`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("/api/translate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -297,7 +297,7 @@ OUTPUT FORMAT:
   ${events.map(e => `{ "id": "${e.id}", "event": "...", ${e.desc ? '"desc": "..."' : '"desc": null'} }`).join(',\n  ')}
 ]`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("/api/translate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -482,6 +482,73 @@ function buildOutputWorkbook(sourceArrayBuffer, sourceParsed, translations, lang
 function downloadWorkbook(wb, filename) {
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ── 의존성 없는 ZIP(STORE) 생성: 여러 xlsx를 하나의 zip으로 묶기 ──
+function _crc32(bytes) {
+  let table = _crc32._t;
+  if (!table) {
+    table = _crc32._t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[n] = c >>> 0;
+    }
+  }
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xFF];
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function _concat(parts) {
+  let total = 0; for (const p of parts) total += p.length;
+  const out = new Uint8Array(total); let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+function createZipBlob(files) {
+  const enc = new TextEncoder();
+  const u16 = (n) => new Uint8Array([n & 0xFF, (n >>> 8) & 0xFF]);
+  const u32 = (n) => new Uint8Array([n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF]);
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const localParts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const data = f.data;
+    const crc = _crc32(data);
+    const size = data.length;
+    const lh = _concat([
+      u32(0x04034b50), u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(crc), u32(size), u32(size),
+      u16(nameBytes.length), u16(0), nameBytes,
+    ]);
+    localParts.push(lh, data);
+    central.push(_concat([
+      u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(crc), u32(size), u32(size),
+      u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0),
+      u32(0), u32(offset), nameBytes,
+    ]));
+    offset += lh.length + data.length;
+  }
+  const centralBytes = _concat(central);
+  const end = _concat([
+    u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length),
+    u32(centralBytes.length), u32(offset), u16(0),
+  ]);
+  return new Blob([...localParts, centralBytes, end], { type: 'application/zip' });
+}
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -760,9 +827,19 @@ function BatchMode() {
   };
   
   const handleDownloadAll = () => {
-    Object.keys(outputs).forEach((lang, i) => {
-      setTimeout(() => handleDownload(lang), i * 250);
-    });
+    const entries = Object.values(outputs);
+    if (entries.length === 0) return;
+    if (entries.length === 1) {
+      downloadWorkbook(entries[0].wb, entries[0].filename);
+      return;
+    }
+    // 2건 이상: 하나의 zip으로 묶어서 다운로드
+    const files = entries.map((out) => ({
+      name: out.filename,
+      data: new Uint8Array(XLSX.write(out.wb, { type: 'array', bookType: 'xlsx' })),
+    }));
+    const base = (parsed && parsed.filename ? parsed.filename : '번역결과').replace(/\.xlsx?$/i, '');
+    downloadBlob(createZipBlob(files), `${base}_번역.zip`);
   };
 
   return (
