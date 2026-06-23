@@ -1231,12 +1231,78 @@ function SingleMode() {
   );
 }
 
+const CORRECT_PASSWORD = import.meta.env.VITE_AUTH_PASSWORD || '';
+
+function LoginScreen({ onLogin }) {
+  const [pw, setPw] = React.useState('');
+  const [error, setError] = React.useState(false);
+  const [shake, setShake] = React.useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (pw === CORRECT_PASSWORD && CORRECT_PASSWORD !== '') {
+      localStorage.setItem('mimisome_auth', 'true');
+      onLogin();
+    } else {
+      setError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F7F3EC', fontFamily: "'Manrope', 'Noto Sans KR', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Manrope:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        .font-display { font-family: 'Fraunces', 'Noto Sans KR', serif; }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+        .shake { animation: shake 0.45s ease; }
+      `}</style>
+      <div className={`w-full max-w-sm mx-4 p-8 rounded-2xl ${shake ? 'shake' : ''}`}
+        style={{ backgroundColor: '#FFFEFC', border: '1px solid #E8DFD0', boxShadow: '0 4px 24px rgba(90,60,30,0.07)' }}>
+        <div className="text-center mb-8">
+          <p className="font-display text-2xl font-medium mb-1" style={{ color: '#3D2817' }}>MIMISOME</p>
+          <p className="text-xs" style={{ color: '#86715A' }}>번역기 접근 비밀번호를 입뭔요</p>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <input
+            type="password"
+            value={pw}
+            onChange={(e) => { setPw(e.target.value); setError(false); }}
+            placeholder="비밀번호"
+            autoFocus
+            className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+            style={{
+              backgroundColor: '#F7F3EC',
+              border: `1px solid ${error ? '#C0392B' : '#D4C9B5'}`,
+              color: '#1a1614',
+            }}
+          />
+          {error && <p className="text-xs text-center" style={{ color: '#C0392B' }}>비밀번호가 올바르지 않습니다</p>}
+          <button type="submit" className="w-full py-3 rounded-xl text-sm font-medium transition-opacity hover:opacity-90"
+            style={{ backgroundColor: '#3D2817', color: '#F7F3EC' }}>
+            입장
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [tab, setTab] = React.useState('batch');
   const [sheetSynced, setSheetSynced] = React.useState(false);
+  const [isLoggedIn, setIsLoggedIn] = React.useState(() => localStorage.getItem('mimisome_auth') === 'true');
+
   React.useEffect(() => {
-    loadDataFromSheets().then((d) => { if (d) { DATA = d; setSheetSynced(true); } });
-  }, []);
+    if (isLoggedIn) {
+      loadDataFromSheets().then((d) => { if (d) { DATA = d; setSheetSynced(true); } });
+    }
+  }, [isLoggedIn]);
+
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   return (
     <div className="min-h-screen" style={{ 
