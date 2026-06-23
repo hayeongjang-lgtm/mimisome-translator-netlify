@@ -1262,7 +1262,7 @@ function LoginScreen({ onLogin }) {
         style={{ backgroundColor: '#FFFEFC', border: '1px solid #E8DFD0', boxShadow: '0 4px 24px rgba(90,60,30,0.07)' }}>
         <div className="text-center mb-8">
           <p className="font-display text-2xl font-medium mb-1" style={{ color: '#3D2817' }}>MIMISOME</p>
-          <p className="text-xs" style={{ color: '#86715A' }}>번역기 접근 비밀번호를 입뭔요</p>
+          <p className="text-xs" style={{ color: '#86715A' }}>번역기 접근 비밀번호를 입력하세요</p>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
