@@ -215,7 +215,7 @@ ${targetLangs.map(l => `  "${l}": { "event": "...", "desc": ${koDesc ? '"..."' :
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
@@ -301,7 +301,7 @@ OUTPUT FORMAT:
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
@@ -563,8 +563,8 @@ function getOutputFilename(srcFilename, lang) {
   const langSuffix = {
     'en': '_영어',
     'jp': '_일본어',
-    'tw': '_번체중국어',
-    'cn': '_간체중국어',
+    'tw': '_대만어',
+    'cn': '_중국어',
     'th': '_태국어',
     'vn': '_베트남어',
   }[lang] || `_${lang}`;
